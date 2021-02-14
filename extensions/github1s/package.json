@@ -13,7 +13,7 @@
     "onCommand:github1s.validate-token",
     "onCommand:github1s.update-token",
     "onCommand:github1s.clear-token",
-    "onCommand:github1s.get-current-ref",
+    "onCommand:github1s.get-current-authority",
     "onCommand:github1s.switch-branch",
     "onCommand:github1s.switch-tag",
     "onView:github1s"

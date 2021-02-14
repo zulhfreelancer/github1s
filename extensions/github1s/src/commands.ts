@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { getExtensionContext, getRepositoryBranches, getRepositoryTags, getCurrentRef, changeCurrentRef } from './util';
+import { getExtensionContext, getRepositoryBranches, getRepositoryTags, getCurrentRef, getCurrentAuthority, changeCurrentRef } from './util';
 import { validateToken } from './api';
 
 export const commandValidateToken = (silent: boolean = false) => {
@@ -65,7 +65,7 @@ export const commandClearToken = (silent: boolean = false) => {
 	});
 };
 
-export const commandGetCurrentRef = (): Promise<string> => getCurrentRef();
+export const commandGetCurrentAuthority = (): Promise<string> => getCurrentAuthority();
 
 export const commandSwitchBranch = () => {
 	return Promise.all([getRepositoryBranches(), getCurrentRef()]).then(([repositoryBranches, currentRef]) => (

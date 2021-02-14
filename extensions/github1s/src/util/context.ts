@@ -21,5 +21,3 @@ export const getOAuthToken = () => {
 };
 
 export const hasValidToken = () => getOAuthToken() !== '';
-
-export const getBrowserUrl = () => (vscode.commands.executeCommand('github1s.vscode.get-browser-url') as Promise<string>);

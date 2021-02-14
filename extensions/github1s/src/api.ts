@@ -20,15 +20,6 @@ export const isGraphQLEnabled = () => {
 	return hasValidToken() && ENABLE_GRAPHQL;
 };
 
-export const parseUri = (uri: vscode.Uri): UriState => {
-	const [owner, repo] = (uri.authority || '').split('+').filter(Boolean);
-	return {
-		owner,
-		repo,
-		path: uri.path,
-	};
-};
-
 const handleRequestError = (error: RequestError) => {
 	if (error instanceof RequestRateLimitError) {
 		if (!error.token) {

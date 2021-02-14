@@ -386,7 +386,7 @@ class WindowIndicator implements IWindowIndicator {
 			}
 
 			if (uri?.scheme === 'github1s') {
-				[repositoryOwner, repositoryName] = uri.authority.split('+');
+				[repositoryOwner = 'conwnet', repositoryName = 'github1s'] = URI.parse(getBrowserUrl()).path.split('/').filter(Boolean);
 			}
 		}
 
@@ -407,7 +407,8 @@ class WindowIndicator implements IWindowIndicator {
 (function () {
 	const [repoOwner = 'conwnet', repoName = 'github1s'] = (URI.parse(window.location.href).path || '').split('/').filter(Boolean);
 	const config: IWorkbenchConstructionOptions & { folderUri?: UriComponents, workspaceUri?: UriComponents } = {
-		folderUri: URI.from({ scheme: "github1s", path: '/', authority: `${repoOwner}+${repoName}` }),
+		// the empty authority means github1s should get it from `window.location.href`
+		folderUri: URI.from({ scheme: "github1s", path: '/', authority: '' }),
 		staticExtensions: [],
 		enableSyncByDefault: false,
 		webWorkerExtensionHostIframeSrc: document.getElementById('vscode-extension-host-iframe-src')?.getAttribute('data-settings') as string,

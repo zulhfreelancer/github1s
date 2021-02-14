@@ -53,14 +53,14 @@ const configurationKey = 'workbench.startupEditor';
 const oldConfigurationKey = 'workbench.welcome.enabled';
 const telemetryFrom = 'welcomePage';
 
-const getCurrentFileState = (ref: string): { owner: string, repo: string, type: string, path: string } => {
+const getCurrentFileState = (ref: string): { type: string, path: string } => {
 	const uri = URI.parse(window.location.href);
-	const [owner = 'conwnet', repo = 'github1s', type, ...otherParts] = (uri.path || '').split('/').filter(Boolean);
+	const [_owner, _repo, type, ...otherParts] = (uri.path || '').split('/').filter(Boolean);
 	const refAndFilePath = otherParts.join('/');
 	if (!['tree', 'blob'].includes(type) || !refAndFilePath.startsWith(ref)) {
-		return { owner, repo, type: 'tree', path: '/' };
+		return { type: 'tree', path: '/' };
 	}
-	return { owner, repo, type, path: refAndFilePath.slice(ref.length) || '/' };
+	return { type, path: refAndFilePath.slice(ref.length) || '/' };
 };
 
 export class WelcomePageContribution implements IWorkbenchContribution {
@@ -80,10 +80,10 @@ export class WelcomePageContribution implements IWorkbenchContribution {
 		const enabled = isWelcomePageEnabled(configurationService, contextService);
 		if (enabled && lifecycleService.startupKind !== StartupKind.ReloadedWindow) {
 			const activeResource = editorService.activeEditor?.resource;
-			getCurrentGithubRef(commandService).then((currentRef: string) => {
-				const fileState = getCurrentFileState(currentRef);
+			getCurrentAuthority(commandService).then((authority: string) => {
+				const fileState = getCurrentFileState(authority.split('+')[2]);
 				if (fileState.path !== '/' && (!activeResource || activeResource.scheme !== 'github1s' || activeResource.path !== fileState.path)) {
-					const currentFileUri = URI.from({ scheme: 'github1s', authority: `${fileState.owner}+${fileState.repo}`, path: fileState.path });
+					const currentFileUri = URI.from({ scheme: 'github1s', authority, path: fileState.path });
 					fileService.resolve(currentFileUri)
 						.then(() => this.commandService.executeCommand(fileState.type === 'tree' ? 'revealInExplorer' : 'vscode.open', currentFileUri))
 						.then(() => this.registerListeners(), () => this.registerListeners());
@@ -135,14 +135,14 @@ export class WelcomePageContribution implements IWorkbenchContribution {
 	}
 
 	private doUpdateWindowUrl(): void {
-		getCurrentGithubRef(this.commandService).then(currentRef => {
-			const state = getCurrentFileState(currentRef);
+		getCurrentAuthority(this.commandService).then(authority => {
+			const [owner, repo, ref] = authority.split('+');
 			const editor = this.editorService.activeEditor;
 			const filePath = this.getGitHubFilePathOrEmpty(editor?.resource);
 			// if no file opened and the branch is HEAD current, only retain owner and repo in url
-			const windowUrl = !filePath && currentRef.toUpperCase() === 'HEAD'
-				? `/${state.owner}/${state.repo}`
-				: `/${state.owner}/${state.repo}/${filePath ? 'blob' : 'tree'}/${currentRef}${filePath}`;
+			const windowUrl = !filePath && ref.toUpperCase() === 'HEAD'
+				? `/${owner}/${repo}`
+				: `/${owner}/${repo}/${filePath ? 'blob' : 'tree'}/${ref}${filePath}`;
 			replaceBrowserUrl(windowUrl);
 		});
 	}
@@ -163,8 +163,8 @@ function isWelcomePageEnabled(configurationService: IConfigurationService, conte
 	return startupEditor.value === 'welcomePage' || startupEditor.value === 'gettingStarted' || startupEditor.value === 'readme' || startupEditor.value === 'welcomePageInEmptyWorkbench' && contextService.getWorkbenchState() === WorkbenchState.EMPTY;
 }
 
-function getCurrentGithubRef(commandService: ICommandService): Promise<string> {
-	return commandService.executeCommand('github1s.get-current-ref') as Promise<string>;
+function getCurrentAuthority(commandService: ICommandService): Promise<string> {
+	return commandService.executeCommand('github1s.get-current-authority') as Promise<string>;
 }
 
 export class WelcomePageAction extends Action {

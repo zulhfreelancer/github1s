@@ -15,8 +15,8 @@ import {
 	FileType,
 	Uri,
 } from 'vscode';
-import { noop, reuseable, getCurrentRef } from './util';
-import { parseUri, readGitHubDirectory, readGitHubFile, UriState, isGraphQLEnabled } from './api';
+import { noop, reuseable, getCurrentAuthority } from './util';
+import { readGitHubDirectory, readGitHubFile, isGraphQLEnabled } from './api';
 import { apolloClient } from './client';
 import { githubObjectQuery } from './github-api-gql';
 import { toUint8Array as decodeBase64 } from 'js-base64';
@@ -124,11 +124,11 @@ export class GitHub1sFS implements FileSystemProvider, Disposable {
 	private async _lookup(uri: Uri, silent: boolean): Promise<Entry | undefined>;
 	private async _lookup(uri: Uri, silent: boolean): Promise<Entry | undefined> {
 		let parts = uri.path.split('/').filter(Boolean);
-		let currentRef = await getCurrentRef();
-		if (!this.root.get(currentRef)) {
-			this.root.set(currentRef, new Directory(uri.with({ path: '/' }), ''));
+		let currentAuthority = await getCurrentAuthority();
+		if (!this.root.get(currentAuthority)) {
+			this.root.set(currentAuthority, new Directory(uri.with({ path: '/' }), ''));
 		}
-		let entry = this.root.get(currentRef);
+		let entry = this.root.get(currentAuthority);
 		for (const part of parts) {
 			let child: Entry | undefined;
 			if (entry instanceof Directory) {
@@ -178,23 +178,18 @@ export class GitHub1sFS implements FileSystemProvider, Disposable {
 	}
 
 	readDirectory = reuseable((uri: Uri): [string, FileType][] | Thenable<[string, FileType][]> => {
-		if (!uri.authority) {
-			throw FileSystemError.FileNotFound(uri);
-		}
-		return this._lookupAsDirectory(uri, false).then(parent => {
+		return this._lookupAsDirectory(uri, false).then(async parent => {
 			if (parent.entries !== null) {
 				return parent.getNameTypePairs();
 			}
 
+			const [owner, repo, ref] = (uri.authority || await getCurrentAuthority()).split('+');
 			if (isGraphQLEnabled()) {
-				return getCurrentRef().then(ref => {
-					const state: UriState = parseUri(uri);
-					const directory = state.path.substring(1);
 					return apolloClient.query({
 						query: githubObjectQuery, variables: {
-							owner: state.owner,
-							repo: state.repo,
-							expression: `${ref}:${directory}`
+							owner,
+							repo,
+							expression: `${ref}:${uri.path.slice(1)}`
 						}
 					})
 						.then((response) => {
@@ -205,10 +200,9 @@ export class GitHub1sFS implements FileSystemProvider, Disposable {
 							parent.entries = entriesToMap(entries, uri);
 							return parent.getNameTypePairs();
 						});
-				});
 			}
-			const [owner, repo] = uri.authority.split('+');
-			return getCurrentRef().then(ref => readGitHubDirectory(owner, repo, ref, uri.path).then(data => {
+
+			return readGitHubDirectory(owner, repo, ref, uri.path).then(data => {
 				parent.entries = new Map<string, Entry>();
 				return data.tree.map((item: any) => {
 					const fileType: FileType = item.type === 'tree' ? FileType.Directory : FileType.File;
@@ -219,15 +213,12 @@ export class GitHub1sFS implements FileSystemProvider, Disposable {
 					);
 					return [item.path, fileType];
 				});
-			}));
+			});
 		});
 	}, (uri: Uri) => uri.toString());
 
 	readFile = reuseable((uri: Uri): Uint8Array | Thenable<Uint8Array> => {
-		if (!uri.authority) {
-			throw FileSystemError.FileNotFound(uri);
-		}
-		return this._lookupAsFile(uri, false).then(file => {
+		return this._lookupAsFile(uri, false).then(async file => {
 			if (file.data !== null) {
 				return file.data;
 			}
@@ -237,7 +228,7 @@ export class GitHub1sFS implements FileSystemProvider, Disposable {
 			 *   1. The GraphQL query is disabled
 			 *   2. The GraphQL query is enabled, but the blob/file is binary
 			 */
-			const [owner, repo] = uri.authority.split('+');
+			const [owner, repo] = (uri.authority || await getCurrentAuthority()).split('+');
 			return readGitHubFile(owner, repo, file.sha).then(blob => {
 				file.data = decodeBase64(blob.content);
 				return file.data;
